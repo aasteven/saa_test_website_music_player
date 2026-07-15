@@ -322,9 +322,9 @@ function updatePlayheadUI() {
   const pos = isPlaying ? getPlayheadSeconds(track) : pausedOffset;
   if (!isSeeking) {
     seekBar.value = Math.round((pos / track.duration) * 100);
+    timeElapsedEl.textContent = formatTime(pos);
+    timeRemainingEl.textContent = `-${formatTime(track.duration - pos)}`;
   }
-  timeElapsedEl.textContent = formatTime(pos);
-  timeRemainingEl.textContent = `-${formatTime(track.duration - pos)}`;
   rafId = requestAnimationFrame(updatePlayheadUI);
 }
 
