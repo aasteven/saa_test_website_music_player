@@ -69,6 +69,8 @@ let isPlaying = false;
 let currentTrackIndex = 0;
 let pausedOffset = 0;
 let loopAnchorCtxTime = 0; // ctx.currentTime corresponding to loop position 0 of the current play run
+let schedulerIntervalId = null; // recurring timer that keeps scheduling future loop iterations
+let nextIterationStartCtxTime = 0; // ctx.currentTime at which the next not-yet-scheduled iteration begins
 
 function getAudioCtx() {
   if (!audioCtx) {
@@ -78,6 +80,10 @@ function getAudioCtx() {
 }
 
 function stopPlayback() {
+  if (schedulerIntervalId) {
+    clearInterval(schedulerIntervalId);
+    schedulerIntervalId = null;
+  }
   scheduledNodes.forEach(osc => {
     try { osc.stop(); } catch (e) { /* already stopped */ }
   });
@@ -102,14 +108,25 @@ function scheduleLoopIteration(track, ctx, iterationStartCtxTime) {
   });
 }
 
+function scheduleUpcomingIterations(track, ctx) {
+  // Keep scheduling loop iterations far enough ahead of playback that
+  // audio never runs out of scheduled notes, without scheduling the
+  // entire (potentially infinite) future up front.
+  const lookaheadSeconds = 2;
+  while (nextIterationStartCtxTime < ctx.currentTime + track.duration + lookaheadSeconds) {
+    scheduleLoopIteration(track, ctx, nextIterationStartCtxTime);
+    nextIterationStartCtxTime += track.duration;
+  }
+}
+
 function playTrack(track, offsetSeconds) {
   const ctx = getAudioCtx();
   stopPlayback();
   loopAnchorCtxTime = ctx.currentTime - offsetSeconds;
-  // Schedule the current partial iteration plus the next full iteration
-  // so playback covers at least one full loop without gaps.
-  scheduleLoopIteration(track, ctx, loopAnchorCtxTime);
-  scheduleLoopIteration(track, ctx, loopAnchorCtxTime + track.duration);
+  nextIterationStartCtxTime = loopAnchorCtxTime;
+  scheduleUpcomingIterations(track, ctx);
+  // Re-run scheduling periodically so the loop keeps going until stopPlayback() is called.
+  schedulerIntervalId = setInterval(() => scheduleUpcomingIterations(track, ctx), 1000);
 }
 
 function getPlayheadSeconds(track) {
