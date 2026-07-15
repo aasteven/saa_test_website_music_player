@@ -1,3 +1,147 @@
+<div class="player-card">
+  <div id="album-art"></div>
+  <div class="track-info">
+    <p id="track-title">Lo-fi Drift</p>
+    <p id="track-artist">Synth Session</p>
+  </div>
+  <div class="seek-row">
+    <input type="range" id="seek-bar" min="0" max="100" value="0" />
+    <div class="time-row">
+      <span id="time-elapsed">0:00</span>
+      <span id="time-remaining">-0:08</span>
+    </div>
+  </div>
+  <div class="controls-row">
+    <button id="btn-prev" aria-label="Previous track">⏮</button>
+    <button id="btn-play-pause" aria-label="Play">▶</button>
+    <button id="btn-next" aria-label="Next track">⏭</button>
+  </div>
+  <div class="volume-row">
+    <span>🔉</span>
+    <input type="range" id="volume-slider" min="0" max="100" value="70" />
+  </div>
+</div>
+<style>
+  :root {
+    --bg: #f4f2fa;
+    --card-bg: #ffffff;
+    --text-primary: #1a1530;
+    --text-secondary: #6b6580;
+    --accent: #6b5b95;
+    --track-bg: #e4e0f0;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12101c;
+      --card-bg: #1c1830;
+      --text-primary: #f0eefa;
+      --text-secondary: #a39dc0;
+      --accent: #a08bd6;
+      --track-bg: #2c2648;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #12101c;
+    --card-bg: #1c1830;
+    --text-primary: #f0eefa;
+    --text-secondary: #a39dc0;
+    --accent: #a08bd6;
+    --track-bg: #2c2648;
+  }
+  :root[data-theme="light"] {
+    --bg: #f4f2fa;
+    --card-bg: #ffffff;
+    --text-primary: #1a1530;
+    --text-secondary: #6b6580;
+    --accent: #6b5b95;
+    --track-bg: #e4e0f0;
+  }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  }
+  .player-card {
+    width: min(340px, 90vw);
+    background: var(--card-bg);
+    border-radius: 24px;
+    padding: 28px;
+    box-shadow: 0 20px 60px -20px rgba(0,0,0,0.35);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  #album-art {
+    width: 200px;
+    height: 200px;
+    border-radius: 50%;
+    box-shadow: 0 12px 30px -8px rgba(0,0,0,0.4);
+    animation: spin 12s linear infinite, pulse 2s ease-in-out infinite;
+    animation-play-state: paused;
+  }
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.85; transform: scale(1.03); }
+  }
+  .track-info { text-align: center; }
+  #track-title { margin: 0; font-size: 1.1rem; color: var(--text-primary); }
+  #track-artist { margin: 4px 0 0; font-size: 0.85rem; color: var(--text-secondary); }
+  .seek-row { width: 100%; display: flex; flex-direction: column; gap: 6px; }
+  #seek-bar, #volume-slider {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+  .time-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+  .controls-row {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+  .controls-row button {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--text-primary);
+    padding: 8px;
+    border-radius: 999px;
+    transition: transform 0.15s ease, opacity 0.15s ease;
+  }
+  .controls-row button:hover { opacity: 0.75; }
+  .controls-row button:active { transform: scale(0.92); }
+  .controls-row button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  #btn-play-pause {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: var(--accent);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .volume-row {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+</style>
 <script>
 const TRACKS = [
   {
