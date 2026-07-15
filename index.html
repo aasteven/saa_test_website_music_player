@@ -216,9 +216,14 @@ let loopAnchorCtxTime = 0; // ctx.currentTime corresponding to loop position 0 o
 let schedulerIntervalId = null; // recurring timer that keeps scheduling future loop iterations
 let nextIterationStartCtxTime = 0; // ctx.currentTime at which the next not-yet-scheduled iteration begins
 
+let masterGain = null;
+
 function getAudioCtx() {
   if (!audioCtx) {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    masterGain = audioCtx.createGain();
+    masterGain.gain.value = 0.7;
+    masterGain.connect(audioCtx.destination);
   }
   return audioCtx;
 }
@@ -245,7 +250,7 @@ function scheduleLoopIteration(track, ctx, iterationStartCtxTime) {
     gainNode.gain.setValueAtTime(0, when);
     gainNode.gain.linearRampToValueAtTime(note.gain, when + 0.02);
     gainNode.gain.linearRampToValueAtTime(0.0001, when + note.dur);
-    osc.connect(gainNode).connect(ctx.destination);
+    osc.connect(gainNode).connect(masterGain);
     osc.start(when);
     osc.stop(when + note.dur + 0.05);
     scheduledNodes.push(osc);
@@ -279,5 +284,118 @@ function getPlayheadSeconds(track) {
   return ((elapsed % track.duration) + track.duration) % track.duration;
 }
 
-// Manual verification only (see Step 2) — no automated test runner for this file.
+const albumArt = document.getElementById('album-art');
+const trackTitleEl = document.getElementById('track-title');
+const trackArtistEl = document.getElementById('track-artist');
+const seekBar = document.getElementById('seek-bar');
+const timeElapsedEl = document.getElementById('time-elapsed');
+const timeRemainingEl = document.getElementById('time-remaining');
+const playPauseBtn = document.getElementById('btn-play-pause');
+const prevBtn = document.getElementById('btn-prev');
+const nextBtn = document.getElementById('btn-next');
+const volumeSlider = document.getElementById('volume-slider');
+
+let rafId = null;
+let isSeeking = false;
+
+function formatTime(seconds) {
+  const s = Math.max(0, Math.round(seconds));
+  const m = Math.floor(s / 60);
+  const rem = s % 60;
+  return `${m}:${rem.toString().padStart(2, '0')}`;
+}
+
+function renderTrack(index) {
+  const track = TRACKS[index];
+  albumArt.style.background = `radial-gradient(circle at 35% 30%, ${track.gradient[0]}, ${track.gradient[1]})`;
+  albumArt.style.animationDuration = `${60 / track.tempo * 8}s, ${60 / track.tempo}s`;
+  trackTitleEl.textContent = track.title;
+  trackArtistEl.textContent = track.artist;
+  seekBar.value = 0;
+  timeElapsedEl.textContent = '0:00';
+  timeRemainingEl.textContent = `-${formatTime(track.duration)}`;
+}
+
+function updatePlayheadUI() {
+  const track = TRACKS[currentTrackIndex];
+  const pos = isPlaying ? getPlayheadSeconds(track) : pausedOffset;
+  if (!isSeeking) {
+    seekBar.value = Math.round((pos / track.duration) * 100);
+  }
+  timeElapsedEl.textContent = formatTime(pos);
+  timeRemainingEl.textContent = `-${formatTime(track.duration - pos)}`;
+  rafId = requestAnimationFrame(updatePlayheadUI);
+}
+
+function setPlayingUI(playing) {
+  playPauseBtn.textContent = playing ? '⏸' : '▶';
+  playPauseBtn.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+  albumArt.style.animationPlayState = playing ? 'running' : 'paused';
+}
+
+function togglePlayPause() {
+  const track = TRACKS[currentTrackIndex];
+  if (isPlaying) {
+    pausedOffset = getPlayheadSeconds(track);
+    stopPlayback();
+    isPlaying = false;
+  } else {
+    getAudioCtx().resume();
+    playTrack(track, pausedOffset);
+    isPlaying = true;
+  }
+  setPlayingUI(isPlaying);
+}
+
+function seekTo(percent) {
+  const track = TRACKS[currentTrackIndex];
+  const targetSeconds = (percent / 100) * track.duration;
+  pausedOffset = targetSeconds;
+  if (isPlaying) {
+    playTrack(track, targetSeconds);
+  }
+}
+
+function goToTrack(index) {
+  const wasPlaying = isPlaying;
+  stopPlayback();
+  isPlaying = false;
+  currentTrackIndex = (index + TRACKS.length) % TRACKS.length;
+  pausedOffset = 0;
+  renderTrack(currentTrackIndex);
+  if (wasPlaying) {
+    getAudioCtx().resume();
+    playTrack(TRACKS[currentTrackIndex], 0);
+    isPlaying = true;
+  }
+  setPlayingUI(isPlaying);
+}
+
+playPauseBtn.addEventListener('click', togglePlayPause);
+prevBtn.addEventListener('click', () => goToTrack(currentTrackIndex - 1));
+nextBtn.addEventListener('click', () => goToTrack(currentTrackIndex + 1));
+seekBar.addEventListener('mousedown', () => { isSeeking = true; });
+seekBar.addEventListener('touchstart', () => { isSeeking = true; });
+seekBar.addEventListener('input', () => {
+  timeElapsedEl.textContent = formatTime((seekBar.value / 100) * TRACKS[currentTrackIndex].duration);
+});
+seekBar.addEventListener('change', () => {
+  seekTo(Number(seekBar.value));
+  isSeeking = false;
+});
+volumeSlider.addEventListener('input', () => {
+  // Simple global volume via a shared GainNode would require refactoring
+  // playTrack's node graph; for this scope, volume controls the
+  // AudioContext destination via a master gain applied at engine level.
+  masterGain.gain.value = volumeSlider.value / 100;
+});
+
+// Ensure the AudioContext (and therefore masterGain) exists before any
+// interaction, so dragging the volume slider prior to first play doesn't
+// dereference a null masterGain. Creating the context without a user
+// gesture just leaves it "suspended" until togglePlayPause() resumes it.
+getAudioCtx();
+
+renderTrack(currentTrackIndex);
+updatePlayheadUI();
 </script>
