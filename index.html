@@ -1,0 +1,122 @@
+<script>
+const TRACKS = [
+  {
+    id: 'lofi-drift',
+    title: 'Lo-fi Drift',
+    artist: 'Synth Session',
+    duration: 8,
+    tempo: 78,
+    waveform: 'sine',
+    gradient: ['#6b5b95', '#2e2350'],
+    notes: [
+      { time: 0.0, freq: 220.00, dur: 0.9, gain: 0.18 },
+      { time: 1.0, freq: 261.63, dur: 0.9, gain: 0.16 },
+      { time: 2.0, freq: 196.00, dur: 0.9, gain: 0.18 },
+      { time: 3.0, freq: 246.94, dur: 0.9, gain: 0.15 },
+      { time: 4.0, freq: 220.00, dur: 0.9, gain: 0.18 },
+      { time: 5.0, freq: 174.61, dur: 0.9, gain: 0.16 },
+      { time: 6.0, freq: 196.00, dur: 0.9, gain: 0.17 },
+      { time: 7.0, freq: 146.83, dur: 0.9, gain: 0.15 }
+    ]
+  },
+  {
+    id: 'neon-pulse',
+    title: 'Neon Pulse',
+    artist: 'Synth Session',
+    duration: 6,
+    tempo: 128,
+    waveform: 'sawtooth',
+    gradient: ['#ff2e88', '#1b0e3d'],
+    notes: [
+      { time: 0.00, freq: 293.66, dur: 0.22, gain: 0.12 },
+      { time: 0.47, freq: 293.66, dur: 0.22, gain: 0.10 },
+      { time: 0.94, freq: 349.23, dur: 0.22, gain: 0.12 },
+      { time: 1.41, freq: 392.00, dur: 0.22, gain: 0.10 },
+      { time: 1.88, freq: 293.66, dur: 0.22, gain: 0.12 },
+      { time: 2.35, freq: 349.23, dur: 0.22, gain: 0.10 },
+      { time: 2.82, freq: 440.00, dur: 0.22, gain: 0.12 },
+      { time: 3.29, freq: 392.00, dur: 0.22, gain: 0.10 },
+      { time: 3.76, freq: 293.66, dur: 0.22, gain: 0.12 },
+      { time: 4.23, freq: 349.23, dur: 0.22, gain: 0.10 },
+      { time: 4.70, freq: 440.00, dur: 0.22, gain: 0.12 },
+      { time: 5.17, freq: 523.25, dur: 0.22, gain: 0.10 }
+    ]
+  },
+  {
+    id: 'midnight-piano',
+    title: 'Midnight Piano',
+    artist: 'Synth Session',
+    duration: 10,
+    tempo: 60,
+    waveform: 'triangle',
+    gradient: ['#1e3a5f', '#0a0f1f'],
+    notes: [
+      { time: 0.0, freq: 261.63, dur: 1.6, gain: 0.20 },
+      { time: 1.0, freq: 329.63, dur: 1.4, gain: 0.16 },
+      { time: 2.0, freq: 392.00, dur: 1.6, gain: 0.18 },
+      { time: 3.5, freq: 329.63, dur: 1.2, gain: 0.14 },
+      { time: 5.0, freq: 293.66, dur: 1.6, gain: 0.20 },
+      { time: 6.0, freq: 349.23, dur: 1.4, gain: 0.16 },
+      { time: 7.0, freq: 440.00, dur: 1.6, gain: 0.18 },
+      { time: 8.5, freq: 349.23, dur: 1.2, gain: 0.14 }
+    ]
+  }
+];
+
+let audioCtx = null;
+let scheduledNodes = [];
+let isPlaying = false;
+let currentTrackIndex = 0;
+let pausedOffset = 0;
+let loopAnchorCtxTime = 0; // ctx.currentTime corresponding to loop position 0 of the current play run
+
+function getAudioCtx() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioCtx;
+}
+
+function stopPlayback() {
+  scheduledNodes.forEach(osc => {
+    try { osc.stop(); } catch (e) { /* already stopped */ }
+  });
+  scheduledNodes = [];
+}
+
+function scheduleLoopIteration(track, ctx, iterationStartCtxTime) {
+  track.notes.forEach(note => {
+    const when = iterationStartCtxTime + note.time;
+    if (when < ctx.currentTime) return;
+    const osc = ctx.createOscillator();
+    const gainNode = ctx.createGain();
+    osc.type = track.waveform;
+    osc.frequency.value = note.freq;
+    gainNode.gain.setValueAtTime(0, when);
+    gainNode.gain.linearRampToValueAtTime(note.gain, when + 0.02);
+    gainNode.gain.linearRampToValueAtTime(0.0001, when + note.dur);
+    osc.connect(gainNode).connect(ctx.destination);
+    osc.start(when);
+    osc.stop(when + note.dur + 0.05);
+    scheduledNodes.push(osc);
+  });
+}
+
+function playTrack(track, offsetSeconds) {
+  const ctx = getAudioCtx();
+  stopPlayback();
+  loopAnchorCtxTime = ctx.currentTime - offsetSeconds;
+  // Schedule the current partial iteration plus the next full iteration
+  // so playback covers at least one full loop without gaps.
+  scheduleLoopIteration(track, ctx, loopAnchorCtxTime);
+  scheduleLoopIteration(track, ctx, loopAnchorCtxTime + track.duration);
+}
+
+function getPlayheadSeconds(track) {
+  const ctx = getAudioCtx();
+  const elapsed = ctx.currentTime - loopAnchorCtxTime;
+  return ((elapsed % track.duration) + track.duration) % track.duration;
+}
+
+// Manual verification only (see Step 2) — no automated test runner for this file.
+</script>
